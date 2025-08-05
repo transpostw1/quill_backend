@@ -1,0 +1,15 @@
+[Unit]
+Description=SISL RAG API
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/path/to/your/rag/api
+Environment=PYTHONPATH=/path/to/your/rag/api
+ExecStart=/path/to/your/venv/bin/python api.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
