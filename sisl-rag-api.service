@@ -4,12 +4,14 @@ After=network.target
 
 [Service]
 Type=simple
-User=your_username
-WorkingDirectory=/path/to/your/rag/api
-Environment=PYTHONPATH=/path/to/your/rag/api
-ExecStart=/path/to/your/venv/bin/python api.py
+User=root
+WorkingDirectory=/home/root/rag-api
+Environment=PYTHONPATH=/home/root/rag-api
+ExecStart=/home/root/rag-api/rag_env/bin/python api.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

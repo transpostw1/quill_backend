@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Deploying SISL RAG API to Ubuntu Server..."
+echo "🚀 Deploying SISL RAG API (Correct Version) to Ubuntu Server..."
 
 # Update system packages
 echo "📦 Updating system packages..."
@@ -54,7 +54,7 @@ Type=simple
 User=$USER
 WorkingDirectory=$APP_DIR
 Environment=PYTHONPATH=$APP_DIR
-ExecStart=$APP_DIR/rag_env/bin/python production_rag_api.py
+ExecStart=$APP_DIR/rag_env/bin/python api.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -72,9 +72,15 @@ sudo systemctl enable sisl-rag-api
 echo "🎉 Deployment completed!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Upload your production_rag_api.py to $APP_DIR/"
+echo "1. Upload your api.py to $APP_DIR/"
 echo "2. Start the service: sudo systemctl start sisl-rag-api"
 echo "3. Check status: sudo systemctl status sisl-rag-api"
 echo "4. View logs: sudo journalctl -u sisl-rag-api -f"
 echo ""
-echo "🔗 Your API will be available at: http://your-server-ip:8002" 
+echo "🔗 Your API will be available at: http://your-server-ip:8000"
+echo ""
+echo "🧪 Test commands:"
+echo "curl http://your-server-ip:8000/health"
+echo "curl -X POST http://your-server-ip:8000/query \\"
+echo "  -H 'Content-Type: application/json' \\"
+echo "  -d '{\"question\": \"How many customers do I have?\"}'" 
