@@ -6,8 +6,11 @@ import uvicorn
 from langchain_qdrant import QdrantVectorStore
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain.prompts import ChatPromptTemplate
+from langchain.memory import ConversationBufferMemory
+from langchain_core.messages import HumanMessage, AIMessage
 import pyodbc
 import logging
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +49,7 @@ app.add_middleware(
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     question: str
+    chat_id: Optional[str] = None
     max_results: Optional[int] = 5
 
 class QueryResponse(BaseModel):
@@ -65,6 +69,40 @@ class HealthResponse(BaseModel):
 qdrant = None
 embeddings = None
 llm = None
+
+# Memory manager for chat sessions
+class ChatMemoryManager:
+    def __init__(self):
+        self.memories = {}
+        self.lock = threading.Lock()
+    
+    def get_memory(self, chat_id: str) -> ConversationBufferMemory:
+        """Get or create conversation memory for a chat ID"""
+        with self.lock:
+            if chat_id not in self.memories:
+                self.memories[chat_id] = ConversationBufferMemory(
+                    memory_key="chat_history", 
+                    return_messages=True
+                )
+            return self.memories[chat_id]
+    
+    def clear_memory(self, chat_id: str):
+        """Clear conversation memory for a chat ID"""
+        with self.lock:
+            if chat_id in self.memories:
+                del self.memories[chat_id]
+    
+    def cleanup_old_memories(self, max_memories: int = 1000):
+        """Clean up old memories to prevent memory leaks"""
+        with self.lock:
+            if len(self.memories) > max_memories:
+                # Remove oldest memories (FIFO)
+                keys_to_remove = list(self.memories.keys())[:len(self.memories) - max_memories]
+                for key in keys_to_remove:
+                    del self.memories[key]
+
+# Initialize memory manager
+memory_manager = ChatMemoryManager()
 
 def initialize_components():
     """Initialize Qdrant, embeddings, and LLM components"""
@@ -201,6 +239,75 @@ async def query_database(request: QueryRequest):
     try:
         logger.info(f"Received query: {request.question}")
         
+        # Get or create conversation memory for this chat
+        chat_id = request.chat_id or "default"
+        conversation_memory = memory_manager.get_memory(chat_id)
+        
+        # Load conversation history
+        memory_vars = conversation_memory.load_memory_variables({})
+        chat_history = memory_vars.get("chat_history", [])
+        
+        # Format chat history for prompt
+        history_text = ""
+        if chat_history:
+            history_text = "\nConversation History:\n"
+            for msg in chat_history[-6:]:  # Last 3 exchanges (6 messages)
+                if isinstance(msg, HumanMessage):
+                    history_text += f"User: {msg.content}\n"
+                elif isinstance(msg, AIMessage):
+                    history_text += f"Assistant: {msg.content}\n"
+        
+        # Classify intent using LLM with conversation context
+        intent_prompt = f"""
+        Classify the following user input as either a "database_query" or "general_conversation".
+        
+        Database queries are questions about data, reports, counts, lists, or information that would require accessing a database.
+        Examples of database queries:
+        - "How many customers do we have?"
+        - "Show me sales by region"
+        - "List all products over $100"
+        
+        General conversation includes greetings, casual chat, or questions that don't require database access.
+        Examples of general conversation:
+        - "Hi"
+        - "How are you?"
+        - "What's your name?"
+        
+        User input: "{request.question}"
+{history_text}
+        Considering the conversation history, respond with ONLY ONE of these two words: "database_query" or "general_conversation"
+        """
+        
+        intent_result = llm.invoke(intent_prompt)
+        intent = intent_result.content.strip().lower()
+        
+        # If it's general conversation, handle it directly without RAG processing
+        if "general_conversation" in intent:
+            conversation_prompt = f"""
+            You are a helpful assistant for a database querying system. 
+            Respond appropriately to this user input: "{request.question}"
+            Keep your response concise and friendly.
+{history_text}
+            """
+            
+            conversation_result = llm.invoke(conversation_prompt)
+            response_text = conversation_result.content.strip()
+            
+            # Save interaction to memory
+            conversation_memory.save_context(
+                {"input": request.question}, 
+                {"output": response_text}
+            )
+            
+            return QueryResponse(
+                question=request.question,
+                generated_sql="",
+                results=[{"response": response_text}],
+                columns=["response"],
+                row_count=1,
+                success=True
+            )
+        
         # Search schema context
         context = search_schema(request.question, request.max_results)
         logger.info("Schema context retrieved successfully")
@@ -225,6 +332,19 @@ async def query_database(request: QueryRequest):
                     row_dict[columns[i]] = str(value) if value is not None else None
             results.append(row_dict)
         
+        # Format results for memory
+        results_text = f"Found {row_count} results"
+        if results:
+            # Include first row as example
+            first_row = results[0]
+            results_text += f". Example: {first_row}"
+        
+        # Save interaction to memory
+        conversation_memory.save_context(
+            {"input": request.question}, 
+            {"output": results_text}
+        )
+        
         return QueryResponse(
             question=request.question,
             generated_sql=generated_sql,
@@ -236,6 +356,16 @@ async def query_database(request: QueryRequest):
         
     except Exception as e:
         logger.error(f"Error processing query: {e}")
+        error_message = f"Error processing query: {str(e)}"
+        
+        # Save error interaction to memory (if chat_id is available)
+        if request.chat_id:
+            conversation_memory = memory_manager.get_memory(request.chat_id)
+            conversation_memory.save_context(
+                {"input": request.question}, 
+                {"output": error_message}
+            )
+        
         return QueryResponse(
             question=request.question,
             generated_sql="",
@@ -268,5 +398,15 @@ async def get_tables():
             "error": str(e)
         }
 
+@app.post("/clear_memory")
+async def clear_memory(chat_id: str):
+    """Clear conversation memory for a specific chat ID"""
+    try:
+        memory_manager.clear_memory(chat_id)
+        return {"message": f"Memory cleared for chat_id: {chat_id}", "success": True}
+    except Exception as e:
+        logger.error(f"Error clearing memory for chat_id {chat_id}: {e}")
+        return {"message": f"Error clearing memory: {str(e)}", "success": False}
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
