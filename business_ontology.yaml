@@ -1,0 +1,431 @@
+business_ontology:
+  fleet_operations:
+    keywords:
+      [
+        "fleet",
+        "vessel",
+        "ship",
+        "tanker",
+        "oil tanker",
+        "imo",
+        "mmsi",
+        "voyage number",
+        "eta",
+        "etd",
+        "port call",
+        "port stay",
+        "berth",
+        "pilotage",
+      ]
+    entities: ["Vessel", "Voyage", "Port Call", "Schedule", "Berth Window"]
+    table_patterns:
+      - "SISL$Vessel"
+      - "SISL$Voyage Header"
+      - "SISL$Voyage Leg"
+      - "SISL$Port Call"
+      - "SISL$Berth Schedule"
+    join_hints:
+      - "Voyage Header.Vessel No_ -> Vessel.No_"
+      - "Port Call.Voyage No_ -> Voyage Header.No_"
+    id_fields: ["Vessel No_", "IMO No_", "MMSI", "Voyage No_"]
+    date_fields: ["ETA", "ETD", "Arrival Date", "Departure Date"]
+    kpis: ["On-time arrival %", "Average port stay (hrs)", "Voyage cycle time"]
+    common_questions:
+      - "Show upcoming port calls this month"
+      - "List voyages delayed more than 24 hours"
+
+  chartering:
+    keywords:
+      [
+        "charter",
+        "charter party",
+        "fixture",
+        "cp",
+        "laycan",
+        "cp terms",
+        "hire",
+        "freight",
+        "broker",
+        "voyage charter",
+        "time charter",
+      ]
+    entities: ["Charter Party", "Fixture", "Counterparty", "Broker"]
+    table_patterns:
+      - "SISL$Charter Party"
+      - "SISL$Fixture"
+      - "SISL$Counterparty"
+      - "SISL$Broker"
+    join_hints:
+      - "Fixture.Charter Party No_ -> Charter Party.No_"
+      - "Charter Party.Counterparty No_ -> Counterparty.No_"
+    id_fields: ["Charter Party No_", "Fixture No_"]
+    date_fields:
+      ["Laycan From", "Laycan To", "Fixture Date", "CP Effective Date"]
+    kpis: ["Avg. fixture time", "Freight rate vs market", "Win rate"]
+    common_questions:
+      - "List fixtures in last quarter with freight above benchmark"
+
+  laytime_demurrage:
+    keywords:
+      [
+        "laytime",
+        "demurrage",
+        "despatch",
+        "NOR",
+        "SOF",
+        "time sheet",
+        "allowed time",
+        "used time",
+      ]
+    entities: ["NOR", "SOF", "Laytime Calc", "Demurrage Claim"]
+    table_patterns:
+      - "SISL$Laytime Calculation"
+      - "SISL$NOR"
+      - "SISL$SOF"
+      - "SISL$Demurrage Claim"
+    join_hints:
+      - "Laytime Calculation.Voyage No_ -> Voyage Header.No_"
+      - "Demurrage Claim.Laytime No_ -> Laytime Calculation.No_"
+    date_fields: ["NOR Tendered", "Time Sheet Start", "Time Sheet End"]
+    amount_fields:
+      ["Allowed Hours", "Used Hours", "Demurrage Amount", "Despatch Amount"]
+    kpis:
+      ["Avg. demurrage per voyage", "Demurrage frequency", "Claim cycle time"]
+    common_questions:
+      - "Show demurrage total by counterparty for 2024"
+
+  bunker_fuel:
+    keywords:
+      [
+        "bunker",
+        "bunkering",
+        "bdn",
+        "bunker delivery note",
+        "ifo",
+        "vlsfo",
+        "hsfo",
+        "mgo",
+        "sulfur",
+        "fuel consumption",
+      ]
+    entities:
+      ["Bunker Delivery Note", "Bunker Sample", "Fuel Consumption", "ROB"]
+    table_patterns:
+      - "SISL$Bunker Delivery Note"
+      - "SISL$Bunker Sample"
+      - "SISL$Fuel Consumption Log"
+      - "SISL$ROB Snapshot"
+    join_hints:
+      - "BDN.Voyage No_ -> Voyage Header.No_"
+      - "Fuel Consumption Log.Vessel No_ -> Vessel.No_"
+    date_fields: ["BDN Date", "Consumption Date"]
+    amount_fields: ["Delivered MT", "Price per MT", "ROB MT", "Consumption MT"]
+    kpis: ["Fuel per day", "Fuel per NM", "Delivered vs ROB variance"]
+    common_questions:
+      - "Fuel consumption by vessel last month vs prior month"
+
+  cargo_operations:
+    keywords:
+      [
+        "cargo",
+        "bill of lading",
+        "bol",
+        "ullage",
+        "custody transfer",
+        "loading",
+        "discharge",
+        "quantity",
+        "api",
+        "temp",
+      ]
+    entities: ["Cargo Parcel", "B/L", "Ullage", "Loading", "Discharge"]
+    table_patterns:
+      - "SISL$Cargo Parcel"
+      - "SISL$Bill of Lading"
+      - "SISL$Ullage Report"
+      - "SISL$Loading Operation"
+      - "SISL$Discharge Operation"
+    join_hints:
+      - "Cargo Parcel.Voyage No_ -> Voyage Header.No_"
+      - "B/L.Cargo No_ -> Cargo Parcel.No_"
+    date_fields: ["Loading Date", "Discharge Date", "B/L Date"]
+    amount_fields:
+      [
+        "B/L Quantity",
+        "Loaded Quantity",
+        "Discharged Quantity",
+        "API",
+        "Temperature",
+      ]
+    kpis: ["Qty loss (B/L vs discharge)", "Load rate", "Discharge rate"]
+    common_questions:
+      - "Show B/L vs discharge variance for last 10 voyages"
+
+  hsse:
+    keywords:
+      [
+        "hse",
+        "hsse",
+        "safety",
+        "incident",
+        "near miss",
+        "inspection",
+        "audit",
+        "risk",
+        "permit to work",
+      ]
+    entities: ["Incident", "Near Miss", "Inspection", "Audit", "PTW"]
+    table_patterns:
+      - "SISL$HSSE Incident"
+      - "SISL$HSSE Near Miss"
+      - "SISL$HSSE Inspection"
+      - "SISL$HSSE Audit"
+    join_hints: []
+    date_fields: ["Incident Date", "Report Date", "Inspection Date"]
+    kpis:
+      [
+        "LTIF",
+        "TRCF",
+        "Incidents by category",
+        "Corrective action closure time",
+      ]
+    common_questions:
+      - "Incidents by severity in the last 12 months"
+
+  crew_management:
+    keywords:
+      [
+        "crew",
+        "seafarer",
+        "crew change",
+        "rank",
+        "certificate",
+        "training",
+        "manning",
+      ]
+    entities: ["Seafarer", "Crew Assignment", "Certificate", "Training"]
+    table_patterns:
+      - "SISL$Seafarer"
+      - "SISL$Crew Assignment"
+      - "SISL$Crew Certificate"
+      - "SISL$Crew Training"
+    join_hints:
+      - "Crew Assignment.Vessel No_ -> Vessel.No_"
+    date_fields: ["Sign On", "Sign Off", "Certificate Expiry"]
+    kpis: ["Crew retention", "Cert expiry risk", "Training compliance"]
+    common_questions:
+      - "Crew due for sign-off in next 30 days"
+
+  technical_pms:
+    keywords:
+      [
+        "technical",
+        "pms",
+        "maintenance",
+        "work order",
+        "defect",
+        "spares",
+        "dry dock",
+      ]
+    entities: ["Work Order", "Defect", "Spare Part", "Dry Dock"]
+    table_patterns:
+      - "SISL$PMS Work Order"
+      - "SISL$Defect Report"
+      - "SISL$Spare Inventory"
+      - "SISL$Dry Dock Project"
+    join_hints:
+      - "Work Order.Vessel No_ -> Vessel.No_"
+    date_fields:
+      ["WO Open Date", "WO Close Date", "Dry Dock Start", "Dry Dock End"]
+    kpis: ["Overdue WOs", "Mean time to repair", "Dry dock cost variance"]
+    common_questions:
+      - "Overdue work orders by vessel"
+
+  procurement_inventory:
+    keywords:
+      [
+        "procurement",
+        "purchase",
+        "rfq",
+        "po",
+        "inventory",
+        "stock",
+        "warehouse",
+        "issuance",
+        "goods receipt",
+      ]
+    entities: ["RFQ", "PO", "Vendor", "Item", "Inventory", "GRN"]
+    table_patterns:
+      - "SISL$Purchase Header"
+      - "SISL$Purchase Line"
+      - "SISL$Vendor"
+      - "SISL$Item"
+      - "SISL$Item Ledger Entry"
+      - "SISL$Warehouse Entry"
+    join_hints:
+      - "Purchase Line.Document No_ -> Purchase Header.No_"
+      - "Item Ledger Entry.Item No_ -> Item.No_"
+    date_fields: ["Posting Date", "Document Date", "Receipt Date"]
+    kpis: ["PO cycle time", "On-time delivery", "Stockout rate"]
+    common_questions:
+      - "Open POs by vendor and expected receipt date"
+
+  finance_ap:
+    keywords:
+      [
+        "accounts payable",
+        "ap",
+        "vendor invoice",
+        "vendor payment",
+        "supplier",
+        "creditor",
+      ]
+    entities:
+      [
+        "Vendor",
+        "Vendor Ledger Entry",
+        "Detailed Vendor Ledger Entry",
+        "Purchase Invoice",
+      ]
+    table_patterns:
+      - "SISL$Vendor"
+      - "SISL$Vendor Ledger Entry"
+      - "SISL$Detailed Vendor Ledger Entry"
+      - "SISL$Purchase Header"
+      - "SISL$Purchase Line"
+    join_hints:
+      - "Vendor Ledger Entry.Vendor No_ -> Vendor.No_"
+      - "Purchase Line.Document No_ -> Purchase Header.No_"
+    date_fields: ["Posting Date", "Document Date", "Due Date"]
+    amount_fields: ["Amount", "Remaining Amount"]
+    kpis: ["AP aging", "Avg. days to pay", "Overdue %"]
+    common_questions:
+      - "Show AP transactions between {start} and {end}"
+
+  finance_ar:
+    keywords:
+      [
+        "accounts receivable",
+        "ar",
+        "customer invoice",
+        "customer payment",
+        "debtor",
+        "credit note",
+      ]
+    entities: ["Customer", "Customer Ledger Entry", "Sales Invoice"]
+    table_patterns:
+      - "SISL$Customer"
+      - "SISL$Customer Ledger Entry"
+      - "SISL$Sales Invoice Header"
+      - "SISL$Sales Invoice Line"
+    join_hints:
+      - "Customer Ledger Entry.Customer No_ -> Customer.No_"
+    date_fields: ["Posting Date", "Due Date"]
+    amount_fields: ["Amount", "Remaining Amount"]
+    kpis: ["AR aging", "DSO", "Overdue %"]
+    common_questions:
+      - "AR aging buckets as of today"
+
+  finance_gl:
+    keywords:
+      [
+        "gl",
+        "general ledger",
+        "trial balance",
+        "balance sheet",
+        "p&l",
+        "journal",
+      ]
+    entities: ["G/L Entry", "G/L Account", "Trial Balance", "Journal"]
+    table_patterns:
+      - "SISL$G_L Entry"
+      - "SISL$G_L Account"
+      - "SISL$Gen_ Journal Line"
+    join_hints:
+      - "G/L Entry.G_L Account No_ -> G/L Account.No_"
+    date_fields: ["Posting Date"]
+    amount_fields: ["Debit Amount", "Credit Amount", "Amount"]
+    kpis: ["Monthly TB by dimension", "P&L by voyage/vessel"]
+    common_questions:
+      - "Trial balance by month YTD"
+
+  treasury_fx:
+    keywords: ["treasury", "cash", "bank", "fx", "hedge", "forward", "swap"]
+    entities: ["Bank Account", "Cash Movement", "FX Contract"]
+    table_patterns:
+      - "SISL$Bank Account"
+      - "SISL$Bank Account Ledger Entry"
+      - "SISL$FX Contract"
+    join_hints: []
+    date_fields: ["Posting Date", "Value Date"]
+    kpis: ["Cash balance trend", "Hedge coverage %"]
+    common_questions:
+      - "Daily bank balances for last 30 days"
+
+  regulatory_compliance:
+    keywords:
+      [
+        "mrv",
+        "dcs",
+        "cII",
+        "emissions",
+        "imo",
+        "isgott",
+        "vetting",
+        "psc",
+        "statutory",
+      ]
+    entities: ["Emissions Report", "Vetting", "PSC Inspection"]
+    table_patterns:
+      - "SISL$Emissions Log"
+      - "SISL$CII Score"
+      - "SISL$PSC Inspection"
+    join_hints: []
+    date_fields: ["Report Date", "Inspection Date"]
+    kpis: ["CII rating trend", "Vetting/PSC findings"]
+    common_questions:
+      - "CII score by vessel for 2024"
+
+  weather_routing:
+    keywords:
+      [
+        "weather",
+        "routing",
+        "noon report",
+        "speed",
+        "rpm",
+        "sea state",
+        "current",
+      ]
+    entities: ["Noon Report", "Weather Route"]
+    table_patterns:
+      - "SISL$Noon Report"
+      - "SISL$Weather Route"
+    join_hints:
+      - "Noon Report.Voyage No_ -> Voyage Header.No_"
+    date_fields: ["Report Date"]
+    kpis: ["Speed vs planned", "Weather delays"]
+    common_questions:
+      - "Noon report history for last voyage"
+
+  ports_agency:
+    keywords:
+      [
+        "agent",
+        "port charges",
+        "proforma da",
+        "final da",
+        "sof",
+        "notice of readiness",
+      ]
+    entities: ["Proforma DA", "Final DA", "SOF"]
+    table_patterns:
+      - "SISL$Proforma DA"
+      - "SISL$Final DA"
+      - "SISL$SOF"
+    join_hints:
+      - "Final DA.Port Call No_ -> Port Call.No_"
+    date_fields: ["DA Date"]
+    kpis: ["DA variance vs proforma"]
+    common_questions:
+      - "Final DA cost by port this year"
